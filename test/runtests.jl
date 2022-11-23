@@ -1,5 +1,5 @@
-using JuliaSARSOP
-const JSOP = JuliaSARSOP # convenience alias
+using NativeSARSOP
+const JSOP = NativeSARSOP # convenience alias
 using POMDPModels
 using POMDPTools
 using Test

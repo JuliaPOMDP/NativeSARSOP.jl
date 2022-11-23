@@ -1,4 +1,4 @@
-module JuliaSARSOP
+module NativeSARSOP
 
 using POMDPs
 using POMDPTools

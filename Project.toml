@@ -1,6 +1,6 @@
-name = "JuliaSARSOP"
+name = "NativeSARSOP"
 uuid = "a07c76ea-660d-4c9a-8028-2e6dbd212cb8"
-authors = ["qiheng <qi.ho@colorado.edu>"]
+authors = ["Tyler Becker <Tyler.Becker-1@colorado.edu>", "Qi Heng Ho <qi.ho@colorado.edu>"]
 version = "0.1.0"
 
 [deps]
