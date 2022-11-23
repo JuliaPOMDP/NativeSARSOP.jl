@@ -1,0 +1,15 @@
+name = "JuliaSARSOP"
+uuid = "a07c76ea-660d-4c9a-8028-2e6dbd212cb8"
+authors = ["qiheng <qi.ho@colorado.edu>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+POMDPTools = "7588e00f-9cae-40de-98dc-e0c70c48cdd7"
+POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[compat]
+POMDPTools = "0.1"
+POMDPs = "0.9"
+julia = "1.7"
