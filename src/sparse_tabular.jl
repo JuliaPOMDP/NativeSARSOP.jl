@@ -12,24 +12,29 @@ function ModifiedSparseTabular(pomdp::POMDP)
     A = ordered_actions(pomdp)
     O = ordered_observations(pomdp)
 
-    T = _tabular_transitions(pomdp, S, A)
-    R = _tabular_rewards(pomdp, S, A)
+    terminal = _vectorized_terminal(pomdp, S)
+    T = _tabular_transitions(pomdp, S, A, terminal)
+    R = _tabular_rewards(pomdp, S, A, terminal)
     O = _tabular_observations(pomdp, S, A, O)
-    term = _vectorized_terminal(pomdp, S)
     b0 = _vectorized_initialstate(pomdp, S)
-    return ModifiedSparseTabular(T,R,O,term,b0,discount(pomdp))
+    return ModifiedSparseTabular(T,R,O,terminal,b0,discount(pomdp))
 end
 
-function _tabular_transitions(pomdp, S, A)
+function _tabular_transitions(pomdp, S, A, terminal)
     T = [Matrix{Float64}(undef, length(S), length(S)) for _ ∈ eachindex(A)]
     for i ∈ eachindex(T)
-        _fill_transitions!(pomdp, T[i], S, A[i])
+        _fill_transitions!(pomdp, T[i], S, A[i], terminal)
     end
     T
 end
 
-function _fill_transitions!(pomdp, T, S, a)
+function _fill_transitions!(pomdp, T, S, a, terminal)
     for (s_idx, s) ∈ enumerate(S)
+        if terminal[s_idx]
+            T[:, s_idx] .= 0.0
+            T[s_idx, s_idx] = 1.0
+            continue
+        end
         Tsa = transition(pomdp, s, a)
         for (sp_idx, sp) ∈ enumerate(S)
             T[sp_idx, s_idx] = pdf(Tsa, sp)
@@ -38,9 +43,13 @@ function _fill_transitions!(pomdp, T, S, a)
     T
 end
 
-function _tabular_rewards(pomdp, S, A)
+function _tabular_rewards(pomdp, S, A, terminal)
     R = Matrix{Float64}(undef, length(S), length(A))
     for (s_idx, s) ∈ enumerate(S)
+        if terminal[s_idx]
+            R[s_idx, :] .= 0.0
+            continue
+        end
         for (a_idx, a) ∈ enumerate(A)
             R[s_idx, a_idx] = reward(pomdp, s, a)
         end
