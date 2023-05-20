@@ -11,20 +11,28 @@ Base.@kwdef struct SARSOPSolver{LOW,UP} <: Solver
     prunethresh::Float64= 0.10
 end
 
-function POMDPs.solve(solver::SARSOPSolver, pomdp::POMDP)
+function solve_info(solver::SARSOPSolver, pomdp::POMDP)
     tree = SARSOPTree(solver, pomdp)
 
     t0 = time()
-    iterations = 0
+    iter = 0
     while time()-t0 < solver.max_time && root_diff(tree) > solver.precision
         sample!(solver, tree)
         backup!(tree)
         prune!(solver, tree)
-        iterations += 1
+        iter += 1
     end
-    return AlphaVectorPolicy(
+
+    pol = AlphaVectorPolicy(
         pomdp,
         getproperty.(tree.Γ, :alpha),
         ordered_actions(pomdp)[getproperty.(tree.Γ, :action)]
     )
+    return pol, (;
+        time = time()-t0, 
+        tree,
+        iter
+    )
 end
+
+POMDPs.solve(solver::SARSOPSolver, pomdp::POMDP) = first(solve_info(solver, pomdp))
