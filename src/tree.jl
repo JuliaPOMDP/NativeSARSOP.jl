@@ -16,7 +16,6 @@ struct SARSOPTree
     Qa_lower::Vector{Vector{Float64}}
 
     ba_children::Vector{UnitRange{Int}} # [ba_idx][o_idx] => bp_idx
-    ba_action::Vector{Int}
     poba::Vector{Vector{Float64}} # [ba_idx][o_idx] => p(o|ba)
 
     _discount::Float64
@@ -54,7 +53,6 @@ function SARSOPTree(solver, pomdp::POMDP)
         Vector{Float64}[],
         Vector{Float64}[],
         Vector{Int}[],
-        Int[],
         Vector{Float64}[],
         discount(pomdp),
         BitVector(),
@@ -156,7 +154,6 @@ function add_action!(tree::SARSOPTree, b_idx::Int, a::Int)
     ba_idx = length(tree.ba_children) + 1
     push!(tree.ba_children, NO_CHILDREN)
     push!(tree.ba_pruned, true)
-    push!(tree.ba_action, a)
     return ba_idx
 end
 

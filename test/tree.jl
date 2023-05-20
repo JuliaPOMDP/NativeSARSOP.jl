@@ -40,7 +40,6 @@
         @test length(tree.V_lower) == n_b
         @test length(tree.Qa_upper) == n_b
         @test length(tree.Qa_lower) == n_b
-        @test length(tree.ba_action) == n_ba
         @test length(tree.poba) == n_ba
         @test length(tree.b_pruned) == n_b
         @test length(tree.ba_pruned) == n_ba
@@ -80,7 +79,7 @@
         JSOP.fill_belief!(tree, b_idx)
         Q̲, Q̄, ap_idx = JSOP.max_r_and_q(tree, b_idx)
         ba_idx = tree.b_children[b_idx][ap_idx]
-        a′ = tree.ba_action[ba_idx]
+        a′ = ap_idx
         Rba′ = JSOP.belief_reward(tree, tree.b[b_idx], a′)
         L′ = max(L, Q̲)
         U′ = max(U, Q̲ + γ^(-t)*ϵ)
