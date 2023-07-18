@@ -11,7 +11,7 @@ Base.@kwdef struct SARSOPSolver{LOW,UP} <: Solver
     prunethresh::Float64= 0.10
 end
 
-function solve_info(solver::SARSOPSolver, pomdp::POMDP)
+function POMDPTools.solve_info(solver::SARSOPSolver, pomdp::POMDP)
     tree = SARSOPTree(solver, pomdp)
 
     t0 = time()
