@@ -13,34 +13,45 @@ function ModifiedSparseTabular(pomdp::POMDP)
     O = ordered_observations(pomdp)
 
     terminal = _vectorized_terminal(pomdp, S)
-    T = _tabular_transitions(pomdp, S, A, terminal)
+    T = transition_matrix_a_sp_s(pomdp)
     R = _tabular_rewards(pomdp, S, A, terminal)
-    O = _tabular_observations(pomdp, S, A, O)
+    O = POMDPTools.ModelTools.observation_matrix_a_sp_o(pomdp)
     b0 = _vectorized_initialstate(pomdp, S)
     return ModifiedSparseTabular(T,R,O,terminal,b0,discount(pomdp))
 end
 
-function _tabular_transitions(pomdp, S, A, terminal)
-    T = [Matrix{Float64}(undef, length(S), length(S)) for _ ∈ eachindex(A)]
-    for i ∈ eachindex(T)
-        _fill_transitions!(pomdp, T[i], S, A[i], terminal)
-    end
-    T
-end
+function transition_matrix_a_sp_s(mdp::Union{MDP, POMDP})
+    S = ordered_states(mdp)
+    A = ordered_actions(mdp)
 
-function _fill_transitions!(pomdp, T, S, a, terminal)
-    for (s_idx, s) ∈ enumerate(S)
-        if terminal[s_idx]
-            T[:, s_idx] .= 0.0
-            T[s_idx, s_idx] = 1.0
-            continue
-        end
-        Tsa = transition(pomdp, s, a)
-        for (sp_idx, sp) ∈ enumerate(S)
-            T[sp_idx, s_idx] = pdf(Tsa, sp)
+    ns = length(S)
+    na = length(A)
+    
+    transmat_row_A = [Int64[] for _ in 1:na]
+    transmat_col_A = [Int64[] for _ in 1:na]
+    transmat_data_A = [Float64[] for _ in 1:na]
+
+    for (si,s) in enumerate(S)
+        for (ai,a) in enumerate(A)
+            if isterminal(mdp, s) # if terminal, there is a probability of 1 of staying in that state
+                push!(transmat_row_A[ai], si)
+                push!(transmat_col_A[ai], si)
+                push!(transmat_data_A[ai], 1.0)
+            else
+                td = transition(mdp, s, a)
+                for (sp, p) in weighted_iterator(td)
+                    if p > 0.0
+                        spi = stateindex(mdp, sp)
+                        push!(transmat_row_A[ai], spi)
+                        push!(transmat_col_A[ai], si)
+                        push!(transmat_data_A[ai], p)
+                    end
+                end
+            end
         end
     end
-    T
+    transmats_A_SP_S = [sparse(transmat_row_A[a], transmat_col_A[a], transmat_data_A[a], ns, ns) for a in 1:na]
+    return transmats_A_SP_S
 end
 
 function _tabular_rewards(pomdp, S, A, terminal)
@@ -55,24 +66,6 @@ function _tabular_rewards(pomdp, S, A, terminal)
         end
     end
     R
-end
-
-function _tabular_observations(pomdp, S, A, O)
-    _O = [Matrix{Float64}(undef, length(S), length(O)) for _ ∈ eachindex(A)]
-    for i ∈ eachindex(_O)
-        _fill_observations!(pomdp, _O[i], S, A[i], O)
-    end
-    _O
-end
-
-function _fill_observations!(pomdp, Oa, S, a, O)
-    for (sp_idx, sp) ∈ enumerate(S)
-        obs_dist = observation(pomdp, a, sp)
-        for (o_idx, o) ∈ enumerate(O)
-            Oa[sp_idx, o_idx] = pdf(obs_dist, o)
-        end
-    end
-    Oa
 end
 
 function _vectorized_terminal(pomdp, S)
