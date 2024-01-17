@@ -8,6 +8,7 @@ import SARSOP
 using SparseArrays
 using RockSample
 using Combinatorics
+using Random
 
 # lil bit of testing type piracy
 JSOP.SARSOPTree(pomdp::POMDP) = JSOP.SARSOPTree(SARSOPSolver(), pomdp)
@@ -27,6 +28,8 @@ include("sample.jl")
 include("updater.jl")
 
 include("tree.jl")
+
+include("backup.jl")
 
 @testset "Tiger POMDP" begin
     pomdp = TigerPOMDP();

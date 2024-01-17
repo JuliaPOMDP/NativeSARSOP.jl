@@ -32,6 +32,7 @@ struct SARSOPTree
     prune_data::PruneData
 
     Γ::Vector{AlphaVec{Int}}
+    β::Vector{SparseMatrixCSC{Float64, Int}}
 end
 
 
@@ -64,7 +65,8 @@ function SARSOPTree(solver, pomdp::POMDP)
         BitVector(),
         cache,
         PruneData(0,0,solver.prunethresh),
-        AlphaVec{Int}[]
+        AlphaVec{Int}[],
+        alpha_backup_lmap(sparse_pomdp)
     )
     return insert_root!(solver, tree, _initialize_belief(pomdp, initialstate(pomdp)))
 end
