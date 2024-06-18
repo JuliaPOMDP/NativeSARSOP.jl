@@ -4,6 +4,7 @@ using POMDPs
 using POMDPTools
 using SparseArrays
 using LinearAlgebra
+using Printf
 
 export SARSOPSolver, SARSOPTree
 
