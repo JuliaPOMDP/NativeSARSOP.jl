@@ -34,18 +34,16 @@ function prune!(tree::SARSOPTree)
             Qa_lower = tree.Qa_lower[b_idx]
             b_children = tree.b_children[b_idx]
             max_lower_bound = maximum(Qa_lower)
-            
+            all_ba_pruned = true
             for (idx, Qba) ∈ enumerate(Qa_upper)
-                all_ba_pruned = true
                 ba_idx = b_children[idx]
                 if !tree.ba_pruned[ba_idx] && Qba < max_lower_bound
                     pruneSubTreeBa!(tree, ba_idx)
                 else
                     all_ba_pruned = false
                 end
-                all_ba_pruned && (tree.b_pruned[b_idx] = true)
             end
-            
+            all_ba_pruned && (tree.b_pruned[b_idx] = true)
         end
     end
 end
