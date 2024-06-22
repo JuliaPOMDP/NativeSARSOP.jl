@@ -60,7 +60,7 @@ end
 function log_verbose_info(t0::Float64, iter::Int, tree::SARSOPTree)
     @printf(" %-10.2f %-10d %-12.7f %-12.7f %-15.10f %-10d %-10d\n", 
         time()-t0, iter, tree.V_lower[1], tree.V_upper[1], root_diff(tree), 
-        length(tree.Γ), sum(.!tree.b_pruned))
+        length(tree.Γ), length(tree.b_pruned) - sum(tree.b_pruned))
 end
 
 function dashed_line(n=86)
