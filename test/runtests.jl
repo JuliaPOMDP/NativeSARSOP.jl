@@ -8,6 +8,7 @@ import SARSOP
 using SparseArrays
 using RockSample
 using Combinatorics
+using Suppressor
 
 # lil bit of testing type piracy
 JSOP.SARSOPTree(pomdp::POMDP) = JSOP.SARSOPTree(SARSOPSolver(), pomdp)
@@ -29,9 +30,9 @@ include("updater.jl")
 include("tree.jl")
 
 @testset "Tiger POMDP" begin
-    pomdp = TigerPOMDP();
-    solver = SARSOPSolver(epsilon = 0.5, precision = 1e-3);
-    tree = SARSOPTree(pomdp);
+    pomdp = TigerPOMDP()
+    solver = SARSOPSolver(epsilon=0.5, precision=1e-3, verbose=false)
+    tree = SARSOPTree(pomdp)
     Γ = solve(solver, pomdp)
     iterations = 0
     while JSOP.root_diff(tree) > solver.precision
@@ -43,16 +44,16 @@ include("tree.jl")
     @test isapprox(tree.V_lower[1], 19.37; atol=1e-1)
     @test JSOP.root_diff(tree) < solver.precision
 
-    solverCPP = SARSOP.SARSOPSolver(trial_improvement_factor = 0.5, precision = 1e-3, verbose = false);
-    policyCPP = solve(solverCPP, pomdp);
+    solverCPP = SARSOP.SARSOPSolver(trial_improvement_factor=0.5, precision=1e-3, verbose=false)
+    policyCPP = solve(solverCPP, pomdp)
     @test abs(value(policyCPP, initialstate(pomdp)) - tree.V_lower[1]) < 0.01
     @test abs(value(policyCPP, initialstate(pomdp)) - value(Γ, initialstate(pomdp))) < 0.01
 end
 
 @testset "Baby POMDP" begin
-    pomdp = BabyPOMDP();
-    solver = SARSOPSolver(epsilon = 0.1, delta = 0.1, precision = 1e-3);
-    tree = SARSOPTree(pomdp);
+    pomdp = BabyPOMDP()
+    solver = SARSOPSolver(epsilon=0.1, delta=0.1, precision=1e-3, verbose=false)
+    tree = SARSOPTree(pomdp)
     Γ = solve(solver, pomdp)
     iterations = 0
     while JSOP.root_diff(tree) > solver.precision
@@ -64,16 +65,16 @@ end
     @test isapprox(tree.V_lower[1], -16.3; atol=1e-2)
     @test JSOP.root_diff(tree) < solver.precision
 
-    solverCPP = SARSOP.SARSOPSolver(trial_improvement_factor = 0.5, precision = 1e-3, verbose = false);
-    policyCPP = solve(solverCPP, pomdp);
+    solverCPP = SARSOP.SARSOPSolver(trial_improvement_factor=0.5, precision=1e-3, verbose=false)
+    policyCPP = solve(solverCPP, pomdp)
     @test abs(value(policyCPP, initialstate(pomdp)) - tree.V_lower[1]) < 0.01
     @test abs(value(policyCPP, initialstate(pomdp)) - value(Γ, initialstate(pomdp))) < 0.01
 end
 
 @testset "RockSample POMDP" begin
-    pomdp = RockSamplePOMDP();
-    solver = SARSOPSolver(epsilon = 0.1, delta = 0.1, precision = 1e-2);
-    tree = SARSOPTree(pomdp);
+    pomdp = RockSamplePOMDP()
+    solver = SARSOPSolver(epsilon=0.1, delta=0.1, precision=1e-2, verbose=false)
+    tree = SARSOPTree(pomdp)
     Γ = solve(solver, pomdp)
     iterations = 0
     while JSOP.root_diff(tree) > solver.precision
@@ -85,8 +86,22 @@ end
     # @test isapprox(tree.V_lower[1], -16.3; atol=1e-2)
     @test JSOP.root_diff(tree) < solver.precision
 
-    solverCPP = SARSOP.SARSOPSolver(trial_improvement_factor = 0.5, precision = 1e-2, verbose = false);
-    policyCPP = solve(solverCPP, pomdp);
+    solverCPP = SARSOP.SARSOPSolver(trial_improvement_factor=0.5, precision=1e-2, verbose=false)
+    policyCPP = solve(solverCPP, pomdp)
     @test abs(value(policyCPP, initialstate(pomdp)) - tree.V_lower[1]) < 0.1
     @test abs(value(policyCPP, initialstate(pomdp)) - value(Γ, initialstate(pomdp))) < 0.1
+end
+
+@testset "Verbose Tests" begin
+    pomdp = TigerPOMDP()
+    solver = SARSOPSolver(; max_time=10.0, verbose=true)
+    output = @capture_out solve(solver, pomdp)
+    @test occursin("Time", output)
+    @test occursin("Iter", output)
+    @test occursin("LB", output)
+    @test occursin("UB", output)
+    @test occursin("Precision", output)
+    @test occursin("# Alphas", output)
+    @test occursin("# Beliefs", output)
+    println(output)
 end
