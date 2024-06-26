@@ -4,6 +4,60 @@ mutable struct PruneData
     prune_threshold::Float64
 end
 
+struct BinManager
+    lowest_ub::Float64
+    num_levels::Int
+    num_of_bins_per_level::Vector{Int}
+    bin_levels_intervals::Vector{Dict{Symbol, Float64}}
+    bin_levels_nodes::Vector{Dict{Int, Dict{Symbol, Union{Tuple{Int, Int}, Float64}}}}
+    bin_levels::Vector{Dict{Symbol, Dict{Tuple{Int, Int}, Union{Float64, Int}}}}
+    previous_lowerbound::Dict{Int, Float64}
+end
+
+function BinManager(Vs_upper::Vector{Float64}, num_bins_per_level=[5, 10])
+    num_levels = length(num_bins_per_level)
+    lowest_ub = minimum(Vs_upper)
+    highest_ub = maximum(Vs_upper)
+    
+    # [level][:ub|:entropy] => value
+    bin_levels_intervals = [Dict{Symbol, Float64}() for _ in 1:num_levels]
+    
+    # [level][b_idx][:key|:prev_error] => (ub_interval_idx, entropy_interval_idx)|previous_error
+    bin_levels_nodes = Vector{Dict{Int, Dict{Symbol, Union{Tuple{Int, Int}, Float64}}}}(undef, num_levels) 
+    
+    # [level][:bin_value|:bin_count|:bin_error][(ub_interval_idx, entropy_interval_idx)] => Float64|Int|Float64
+    bin_levels = Vector{Dict{Symbol, Dict{Tuple{Int, Int}, Union{Float64, Int}}}}(undef, num_levels) 
+    
+    num_states = length(Vs_upper)
+    max_e = max_entropy(num_states)
+    for level_i in 1:num_levels
+        num_bins = num_bins_per_level[level_i]
+        
+        bin_levels_intervals[level_i][:ub] = (highest_ub - lowest_ub) / num_bins
+        bin_levels_intervals[level_i][:entropy] = max_e / num_bins
+        
+        bin_levels_nodes[level_i] = Dict{Int, Dict{Symbol, Union{Tuple{Int, Int}, Float64}}}()
+        
+        level = Dict{Symbol, Dict{Tuple{Int, Int}, Union{Float64, Int}}}()
+        level[:bin_value] = Dict{Tuple{Int, Int}, Float64}()
+        level[:bin_count] = Dict{Tuple{Int, Int}, Int}()
+        level[:bin_error] = Dict{Tuple{Int, Int}, Float64}()
+        bin_levels[level_i] = level
+    end
+    
+    previous_lowerbound = Dict{Int, Float64}() # b_idx => lowerbound
+    
+    return BinManager(
+        lowest_ub,
+        num_levels,
+        num_bins_per_level,
+        bin_levels_intervals,
+        bin_levels_nodes,
+        bin_levels,
+        previous_lowerbound
+    )
+end
+
 struct SARSOPTree
     pomdp::ModifiedSparseTabular
 
@@ -32,16 +86,20 @@ struct SARSOPTree
     prune_data::PruneData
 
     Γ::Vector{AlphaVec{Int}}
+    
+    bm::BinManager
 end
 
 
-function SARSOPTree(solver, pomdp::POMDP)
+function SARSOPTree(solver, pomdp::POMDP; num_bins_per_level=[5, 10])
     sparse_pomdp = ModifiedSparseTabular(pomdp)
     cache = TreeCache(sparse_pomdp)
 
     upper_policy = solve(solver.init_upper, sparse_pomdp)
     corner_values = map(maximum, zip(upper_policy.alphas...))
 
+    bin_manager = BinManager(corner_values, num_bins_per_level)
+    
     tree = SARSOPTree(
         sparse_pomdp,
 
@@ -64,7 +122,8 @@ function SARSOPTree(solver, pomdp::POMDP)
         BitVector(),
         cache,
         PruneData(0,0,solver.prunethresh),
-        AlphaVec{Int}[]
+        AlphaVec{Int}[],
+        bin_manager
     )
     return insert_root!(solver, tree, _initialize_belief(pomdp, initialstate(pomdp)))
 end
@@ -163,6 +222,7 @@ function fill_belief!(tree::SARSOPTree, b_idx::Int)
     else
         fill_populated!(tree, b_idx)
     end
+    update_bin_node!(tree, b_idx)
 end
 
 """
@@ -248,4 +308,133 @@ function fill_unpopulated!(tree::SARSOPTree, b_idx::Int)
     tree.Qa_lower[b_idx] = Qa_lower
     tree.V_lower[b_idx] = lower_value(tree, tree.b[b_idx])
     tree.V_upper[b_idx] = maximum(tree.Qa_upper[b_idx])
+end
+
+function initialize_bin_node!(tree::SARSOPTree, b_idx::Int)
+    lb_val = tree.V_lower[b_idx]
+    ub_val = tree.V_upper[b_idx]
+    node_entropy = entropy(tree.b[b_idx])
+    
+    for level_i in 1:tree.bm.num_levels
+        ub_interval_idx = get_interval_idx(
+            ub_val, tree.bm.lowest_ub, tree.bm.bin_levels_intervals[level_i][:ub], 
+            tree.bm.num_of_bins_per_level[level_i]
+        )
+        
+        entropy_interval_idx = get_interval_idx(
+            node_entropy, 0.0, tree.bm.bin_levels_intervals[level_i][:entropy], 
+            tree.bm.num_of_bins_per_level[level_i]
+        )
+        
+        key = (ub_interval_idx, entropy_interval_idx)
+        
+        if !haskey(tree.bm.bin_levels_nodes[level_i], b_idx)
+            tree.bm.bin_levels_nodes[level_i] = Dict(b_idx => Dict(:key => key))
+        end
+        
+        bin_count = get(tree.bm.bin_levels[level_i][:bin_count], key, 0)
+        if bin_count > 0
+            err = tree.bm.bin_levels[level_i][:bin_value][key] - lb_val
+            tree.bm.bin_levels_nodes[level_i][b_idx][:prev_error] = err * err
+            tree.bm.bin_levels[level_i][:bin_value][key] += err * err
+            
+            value = (tree.bm.bin_levels[level_i][:bin_value][key] * bin_count + lb_val) / (bin_count + 1)
+            tree.bm.bin_levels[level_i][:bin_count][key] += 1
+        else
+            err = ub_val - lb_val
+            tree.bm.bin_levels_nodes[level_i][b_idx][:prev_error] = err * err
+            tree.bm.bin_levels[level_i][:bin_error][key] = err * err
+            
+            value = lb_val
+            tree.bm.bin_levels[level_i][:bin_count] = Dict(key => bin_count + 1)
+        end
+        tree.bm.bin_levels[level_i][:bin_value][key] = value
+    end
+    tree.bm.previous_lowerbound[b_idx] = lb_val
+end
+
+function update_bin_node!(tree::SARSOPTree, b_idx::Int)
+    lb_val = tree.V_lower[b_idx]
+    up_val = tree.V_upper[b_idx]
+   
+    if !haskey(tree.bm.bin_levels_nodes[1], b_idx)
+        return initialize_bin_node!(tree, b_idx)
+    end
+    
+    key = tree.bm.bin_levels_nodes[1][b_idx][:key]
+    bin_count = get(tree.bm.bin_levels[1][:bin_count], key, 0)
+    if bin_count == 0
+        error("We shouldn't ever reach here, right?")
+        # return initialize_bin_node!(tree, b_idx)
+    end
+    
+    for level_i in 1:tree.bm.num_levels
+        key = tree.bm.bin_levels_nodes[level_i][b_idx][:key]
+        
+        bin_count = get(tree.bm.bin_levels[level_i][:bin_count], key, 0)
+        if bin_count == 1
+            err = up_val - lb_val
+            tree.bm.bin_levels_nodes[level_i][b_idx][:prev_error] = err * err
+            tree.bm.bin_levels[level_i][:bin_error][key] = err * err
+        else
+            err = tree.bm.bin_levels[level_i][:bin_value][key] - lb_val
+            tree.bm.bin_levels[level_i][:bin_error][key] -= tree.bm.bin_levels_nodes[level_i][b_idx][:prev_error]
+            tree.bm.bin_levels_nodes[level_i][b_idx][:prev_error] = err * err
+            tree.bm.bin_levels[level_i][:bin_error][key] += err * err
+        end
+
+        tree.bm.bin_levels[level_i][:bin_value][key] = (tree.bm.bin_levels[level_i][:bin_value][key] * bin_count + lb_val - tree.bm.previous_lowerbound[b_idx]) / bin_count
+    end
+    tree.bm.previous_lowerbound[b_idx] = lb_val
+end
+
+function get_bin_value(tree::SARSOPTree, b_idx::Int)
+    
+    lb_val = tree.V_lower[b_idx]
+    ub_val = tree.V_upper[b_idx]
+    
+    key = tree.bm.bin_levels_nodes[1][b_idx][:key]
+    if tree.bm.bin_levels[1][:bin_count][key] == 1
+        return ub_val
+    else
+        smallest_error = Inf
+        best_level = 0
+        best_key = key
+        for level_i in 1:tree.bm.num_levels
+            key = tree.bm.bin_levels_nodes[level_i][b_idx][:key]
+            if tree.bm.bin_levels[level_i][:bin_error][key] + 1e-10 < smallest_error
+                best_level = level_i
+                smallest_error = tree.bm.bin_levels[level_i][:bin_error][key]
+                best_key = key
+            end
+        end
+        
+        if tree.bm.bin_levels[best_level][:bin_value][best_key] > ub_val + 1e-10
+            return ub_val
+        elseif tree.bm.bin_levels[best_level][:bin_value][best_key] + 1e-10 < lb_val
+            return lb_val
+        else    
+            return tree.bm.bin_levels[best_level][:bin_value][best_key]
+        end
+    end
+end
+
+function max_entropy(n::Int)
+    return -1 * ((1.0 / n) * log(1.0 / n)) * n
+end
+
+function entropy(b::AbstractVector)
+    ent = 0.0
+    for b_i in b
+        b_i > 0 && (ent -= b_i * log(b_i))
+    end
+    return ent
+end
+
+function get_interval_idx(value::Float64, lower::Float64, interval::Float64, num_intervals::Int)
+    if interval == 0.0
+        return 1
+    end
+    idx = Int(floor((value - lower) / interval) + 1)
+    return clamp(idx, 1, num_intervals) 
 end
