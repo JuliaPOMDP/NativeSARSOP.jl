@@ -9,6 +9,7 @@ Base.@kwdef struct SARSOPSolver{LOW,UP} <: Solver
     init_lower::LOW     = BlindLowerBound(bel_res = 1e-2)
     init_upper::UP      = FastInformedBound(bel_res=1e-2)
     prunethresh::Float64= 0.10
+    use_binning::Bool   = true
 end
 
 function POMDPTools.solve_info(solver::SARSOPSolver, pomdp::POMDP)
@@ -20,7 +21,7 @@ function POMDPTools.solve_info(solver::SARSOPSolver, pomdp::POMDP)
     
     t0 = time()
     iter = 0
-    while time()-t0 < solver.max_time && root_diff(tree) > solver.precision
+    while iter <= solver.max_steps && time()-t0 < solver.max_time && root_diff(tree) > solver.precision
         sample!(solver, tree)
         backup!(tree)
         prune!(solver, tree)
