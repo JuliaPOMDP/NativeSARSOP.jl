@@ -87,6 +87,7 @@ struct SARSOPTree
 
     Γ::Vector{AlphaVec{Int}}
     
+    use_binning::Bool
     bm::BinManager
 end
 
@@ -123,6 +124,7 @@ function SARSOPTree(solver, pomdp::POMDP; num_bins_per_level=[5, 10])
         cache,
         PruneData(0,0,solver.prunethresh),
         AlphaVec{Int}[],
+        solver.use_binning,
         bin_manager
     )
     return insert_root!(solver, tree, _initialize_belief(pomdp, initialstate(pomdp)))
@@ -222,7 +224,9 @@ function fill_belief!(tree::SARSOPTree, b_idx::Int)
     else
         fill_populated!(tree, b_idx)
     end
-    update_bin_node!(tree, b_idx)
+    if tree.use_binning
+        update_bin_node!(tree, b_idx)
+    end
 end
 
 """
