@@ -365,13 +365,6 @@ function update_bin_node!(tree::SARSOPTree, b_idx::Int)
         return initialize_bin_node!(tree, b_idx)
     end
     
-    key = tree.bm.bin_levels_nodes[1][b_idx][:key]
-    bin_count = get(tree.bm.bin_levels[1][:bin_count], key, 0)
-    if bin_count == 0
-        error("We shouldn't ever reach here, right?")
-        # return initialize_bin_node!(tree, b_idx)
-    end
-    
     for level_i in 1:tree.bm.num_levels
         key = tree.bm.bin_levels_nodes[level_i][b_idx][:key]
         
