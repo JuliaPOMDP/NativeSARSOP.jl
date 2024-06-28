@@ -140,5 +140,4 @@ function prune_strictly_dominated!(tree::SARSOPTree, eps=1e-10)
     
     Γ_idxs_to_delete = setdiff(1:length(Γ), Γ_new_idxs)
     deleteat!(Γ, Γ_idxs_to_delete)
-    tree.prune_data.last_Γ_size = length(Γ)
 end
