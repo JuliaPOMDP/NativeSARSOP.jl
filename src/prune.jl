@@ -49,61 +49,58 @@ function prune!(tree::SARSOPTree)
     end
 end
 
-function belief_space_domination(α1, α2, B, δ)
-    a1_dominant = true
-    a2_dominant = true
-    for b ∈ B
-        !a1_dominant && !a2_dominant && return (false, false)
-        δV = intersection_distance(α1, α2, b)
-        δV ≤ δ && (a1_dominant = false)
-        δV ≥ -δ && (a2_dominant = false)
-    end
-    return a1_dominant, a2_dominant
+@inline function intersection_distance_new(α1, α2, b)
+    diff = α1 - α2
+    dot_b = dot(diff, b)
+    dot_diff = dot(diff, diff)
+    d = dot_b / sqrt(dot_diff)
+    return d
 end
-
-@inline function intersection_distance(α1, α2, b)
-    s = 0.0
-    dot_sum = 0.0
-    I,B = b.nzind, b.nzval
-    @inbounds for _i ∈ eachindex(I)
-        i = I[_i]
-        diff = α1[i] - α2[i]
-        s += abs2(diff)
-        dot_sum += diff*B[_i]
-    end
-    return dot_sum / sqrt(s)
-end
-
-function prune_alpha!(tree::SARSOPTree, δ)
+function prune_alpha!(tree::SARSOPTree, δ, eps=0.0)
     Γ = tree.Γ
     B_valid = tree.b[map(!,tree.b_pruned)]
-    pruned = falses(length(Γ))
+    
+    n_Γ = length(Γ)
+    n_B = length(B_valid)
+    
+    dominant_indices_bools = falses(n_Γ)
+    dominant_vector_indices = Vector{Int}(undef, n_B)
+    
+    # First, identify dominant alpha vectors
+    for b_idx in 1:n_B
+        max_value = -Inf
+        max_index = -1
+        for i in 1:n_Γ
+            value = dot(Γ[i], B_valid[b_idx])
+            if value > max_value
+                max_value = value
+                max_index = i
+            end
+        end
+        dominant_indices_bools[max_index] = true
+        dominant_vector_indices[b_idx] = max_index
+    end
 
-    # checking if α_i dominates α_j
-    for (i,α_i) ∈ enumerate(Γ)
-        pruned[i] && continue
-        for (j,α_j) ∈ enumerate(Γ)
-            (j ≤ i || pruned[j]) && continue
-            a1_dominant,a2_dominant = belief_space_domination(α_i, α_j, B_valid, δ)
-            #=
-            NOTE: α1 and α2 shouldn't technically be able to mutually dominate
-            i.e. a1_dominant and a2_dominant should never both be true.
-            But this does happen when α1 == α2 because intersection_distance returns NaN.
-            Current impl prunes α2 without doing an equality check, removing
-            the duplicate α. Could do equality check to short-circuit
-            belief_space_domination which would speed things up if we have
-            a lot of duplicates, but the equality check can slow things down
-            if α's are sufficiently diverse.
-            =#
-            if a1_dominant
-                pruned[j] = true
-            elseif a2_dominant
-                pruned[i] = true
-                break
+    non_dominant_indices = findall(!, dominant_indices_bools)
+    n_non_dom = length(non_dominant_indices)
+    keep_non_dom = falses(n_non_dom)
+    
+    for b_idx in 1:n_B
+        dom_vec_idx = dominant_vector_indices[b_idx]
+        for j in 1:n_non_dom
+            non_dom_idx = non_dominant_indices[j]
+            if keep_non_dom[j]
+                continue
+            end
+            intx_dist = intersection_distance_new(Γ[dom_vec_idx], Γ[non_dom_idx], B_valid[b_idx])
+            if !isnan(intx_dist) && (intx_dist + eps ≤ δ)
+                keep_non_dom[j] = true
             end
         end
     end
-    deleteat!(Γ, pruned)
+    
+    non_dominant_indices = non_dominant_indices[.!keep_non_dom]
+    deleteat!(Γ, non_dominant_indices)
     tree.prune_data.last_Γ_size = length(Γ)
 end
 
