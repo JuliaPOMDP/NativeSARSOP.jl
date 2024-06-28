@@ -27,6 +27,8 @@ include("sample.jl")
 
 include("updater.jl")
 
+include("prune.jl")
+
 include("tree.jl")
 
 @testset "Tiger POMDP" begin
