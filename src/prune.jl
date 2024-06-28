@@ -49,7 +49,7 @@ function prune!(tree::SARSOPTree)
     end
 end
 
-@inline function intersection_distance_new(α1, α2, b)
+@inline function intersection_distance(α1, α2, b)
     diff = α1 - α2
     dot_b = dot(diff, b)
     dot_diff = dot(diff, diff)
@@ -92,7 +92,7 @@ function prune_alpha!(tree::SARSOPTree, δ, eps=0.0)
             if keep_non_dom[j]
                 continue
             end
-            intx_dist = intersection_distance_new(Γ[dom_vec_idx], Γ[non_dom_idx], B_valid[b_idx])
+            intx_dist = intersection_distance(Γ[dom_vec_idx], Γ[non_dom_idx], B_valid[b_idx])
             if !isnan(intx_dist) && (intx_dist + eps ≤ δ)
                 keep_non_dom[j] = true
             end
