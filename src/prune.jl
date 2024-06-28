@@ -5,6 +5,7 @@ end
 
 function prune!(solver::SARSOPSolver, tree::SARSOPTree)
     prune!(tree)
+    prune_strictly_dominated!(tree::SARSOPTree)
     if should_prune_alphas(tree)
         prune_alpha!(tree, solver.delta)
     end
@@ -103,5 +104,41 @@ function prune_alpha!(tree::SARSOPTree, δ)
         end
     end
     deleteat!(Γ, pruned)
+    tree.prune_data.last_Γ_size = length(Γ)
+end
+
+function strictly_dominates(α1, α2, eps)
+    for ii in 1:length(α1)
+        if α1[ii] < α2[ii] - eps
+            return false
+        end
+    end
+    return true
+end
+
+function prune_strictly_dominated!(tree::SARSOPTree, eps=1e-10)
+    Γ = tree.Γ
+    Γ_new_idxs = []
+    
+    for (α_try_idx, α_try) in enumerate(Γ)
+        marked_for_deletion = falses(length(Γ_new_idxs))
+        dominated = false
+        for (jj, α_in_idx) in enumerate(Γ_new_idxs)
+            α_in = Γ[α_in_idx]
+            if strictly_dominates(α_try, α_in, eps)
+                marked_for_deletion[jj] = true
+            elseif strictly_dominates(α_in, α_try, eps)
+                dominated = true
+                break
+            end
+        end
+        if !dominated
+            Γ_new_idxs = Γ_new_idxs[.!marked_for_deletion]
+            push!(Γ_new_idxs, α_try_idx)
+        end
+    end
+    
+    Γ_idxs_to_delete = setdiff(1:length(Γ), Γ_new_idxs)
+    deleteat!(Γ, Γ_idxs_to_delete)
     tree.prune_data.last_Γ_size = length(Γ)
 end
