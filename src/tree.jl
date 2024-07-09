@@ -35,8 +35,8 @@ struct SARSOPTree
 end
 
 
-function SARSOPTree(solver, pomdp::POMDP)
-    sparse_pomdp = ModifiedSparseTabular(pomdp)
+function SARSOPTree(solver, pomdp::POMDP, b0)
+    sparse_pomdp = ModifiedSparseTabular(pomdp, b0)
     cache = TreeCache(sparse_pomdp)
 
     upper_policy = solve(solver.init_upper, sparse_pomdp)

@@ -11,8 +11,8 @@ Base.@kwdef struct SARSOPSolver{LOW,UP} <: Solver
     prunethresh::Float64= 0.10
 end
 
-function POMDPTools.solve_info(solver::SARSOPSolver, pomdp::POMDP)
-    tree = SARSOPTree(solver, pomdp)
+function POMDPTools.solve_info(solver::SARSOPSolver, pomdp::POMDP; b0=initialstate(pomdp))
+    tree = SARSOPTree(solver, pomdp, b0)
     
     if solver.verbose
         initialize_verbose_output()
@@ -48,7 +48,8 @@ function POMDPTools.solve_info(solver::SARSOPSolver, pomdp::POMDP)
     )
 end
 
-POMDPs.solve(solver::SARSOPSolver, pomdp::POMDP) = first(solve_info(solver, pomdp))
+POMDPs.solve(solver::SARSOPSolver, pomdp::POMDP; b0=initialstate(pomdp)) =
+    first(solve_info(solver, pomdp; b0))
 
 function initialize_verbose_output()
     dashed_line()

@@ -7,7 +7,7 @@ struct ModifiedSparseTabular <: POMDP{Int,Int,Int}
     discount::Float64
 end
 
-function ModifiedSparseTabular(pomdp::POMDP)
+function ModifiedSparseTabular(pomdp::POMDP, b0)
     S = ordered_states(pomdp)
     A = ordered_actions(pomdp)
     O = ordered_observations(pomdp)
@@ -16,7 +16,7 @@ function ModifiedSparseTabular(pomdp::POMDP)
     T = transition_matrix_a_sp_s(pomdp)
     R = _tabular_rewards(pomdp, S, A, terminal)
     O = POMDPTools.ModelTools.observation_matrix_a_sp_o(pomdp)
-    b0 = _vectorized_initialstate(pomdp, S)
+    b0 = _vectorized_initialstate(b0, S)
     return ModifiedSparseTabular(T,R,O,terminal,b0,discount(pomdp))
 end
 
@@ -76,8 +76,7 @@ function _vectorized_terminal(pomdp, S)
     return term
 end
 
-function _vectorized_initialstate(pomdp, S)
-    b0 = initialstate(pomdp)
+function _vectorized_initialstate(b0, S)
     b0_vec = Vector{Float64}(undef, length(S))
     @inbounds for i ∈ eachindex(S, b0_vec)
         b0_vec[i] = pdf(b0, S[i])
