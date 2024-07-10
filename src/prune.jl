@@ -49,12 +49,18 @@ function prune!(tree::SARSOPTree)
     end
 end
 
-@inline function intersection_distance(α1, α2, b)
-    diff = α1 - α2
-    dot_b = dot(diff, b)
-    dot_diff = dot(diff, diff)
-    d = dot_b / sqrt(dot_diff)
-    return d
+function intersection_distance(α1, α2, b)
+    dot_sum = 0.0
+    I,B = b.nzind, b.nzval
+    for _i ∈ eachindex(I)
+        i = I[_i]
+        dot_sum += (α1[i] - α2[i])*B[_i]
+    end
+    s = 0.0
+    for i ∈ eachindex(α1, α2)
+        s += (α1[i] - α2[i])^2
+    end
+    return dot_sum / sqrt(s)
 end
 
 function prune_alpha!(tree::SARSOPTree, δ, eps=0.0)
