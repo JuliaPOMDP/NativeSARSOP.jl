@@ -122,7 +122,7 @@ end
 
 function prune_strictly_dominated!(tree::SARSOPTree, eps=1e-10)
     Γ = tree.Γ
-    Γ_new_idxs = []
+    Γ_new_idxs = Int[]
 
     for (α_try_idx, α_try) in enumerate(Γ)
         marked_for_deletion = falses(length(Γ_new_idxs))
