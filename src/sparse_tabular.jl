@@ -1,4 +1,4 @@
-struct ModifiedSparseTabular <: POMDP{Int,Int,Int}
+struct ModifiedSparseTabular <: POMDP{Int, Int, Int}
     T::Vector{SparseMatrixCSC{Float64, Int64}} # T[a][sp, s]
     R::Array{Float64, 2} # R[s,a]
     O::Vector{SparseMatrixCSC{Float64, Int64}} # O[a][sp, o]
@@ -17,7 +17,7 @@ function ModifiedSparseTabular(pomdp::POMDP, b0)
     R = _tabular_rewards(pomdp, S, A, terminal)
     O = POMDPTools.ModelTools.observation_matrix_a_sp_o(pomdp)
     b0 = _vectorized_initialstate(b0, S)
-    return ModifiedSparseTabular(T,R,O,terminal,b0,discount(pomdp))
+    return ModifiedSparseTabular(T, R, O, terminal, b0, discount(pomdp))
 end
 
 function transition_matrix_a_sp_s(mdp::Union{MDP, POMDP})
@@ -26,20 +26,20 @@ function transition_matrix_a_sp_s(mdp::Union{MDP, POMDP})
 
     ns = length(S)
     na = length(A)
-    
-    transmat_row_A = [Int64[] for _ in 1:na]
-    transmat_col_A = [Int64[] for _ in 1:na]
-    transmat_data_A = [Float64[] for _ in 1:na]
 
-    for (si,s) in enumerate(S)
-        for (ai,a) in enumerate(A)
+    transmat_row_A = [Int64[] for _ ∈ 1:na]
+    transmat_col_A = [Int64[] for _ ∈ 1:na]
+    transmat_data_A = [Float64[] for _ ∈ 1:na]
+
+    for (si, s) ∈ enumerate(S)
+        for (ai, a) ∈ enumerate(A)
             if isterminal(mdp, s) # if terminal, there is a probability of 1 of staying in that state
                 push!(transmat_row_A[ai], si)
                 push!(transmat_col_A[ai], si)
                 push!(transmat_data_A[ai], 1.0)
             else
                 td = transition(mdp, s, a)
-                for (sp, p) in weighted_iterator(td)
+                for (sp, p) ∈ weighted_iterator(td)
                     if p > 0.0
                         spi = stateindex(mdp, sp)
                         push!(transmat_row_A[ai], spi)
@@ -50,7 +50,10 @@ function transition_matrix_a_sp_s(mdp::Union{MDP, POMDP})
             end
         end
     end
-    transmats_A_SP_S = [sparse(transmat_row_A[a], transmat_col_A[a], transmat_data_A[a], ns, ns) for a in 1:na]
+    transmats_A_SP_S = [
+        sparse(transmat_row_A[a], transmat_col_A[a], transmat_data_A[a], ns, ns) for
+        a ∈ 1:na
+    ]
     return transmats_A_SP_S
 end
 
@@ -65,12 +68,12 @@ function _tabular_rewards(pomdp, S, A, terminal)
             R[s_idx, a_idx] = reward(pomdp, s, a)
         end
     end
-    R
+    return R
 end
 
 function _vectorized_terminal(pomdp, S)
     term = BitVector(undef, length(S))
-    @inbounds for i ∈ eachindex(term,S)
+    @inbounds for i ∈ eachindex(term, S)
         term[i] = isterminal(pomdp, S[i])
     end
     return term

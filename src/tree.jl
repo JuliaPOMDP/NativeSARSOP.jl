@@ -7,7 +7,7 @@ end
 struct SARSOPTree
     pomdp::ModifiedSparseTabular
 
-    b::Vector{SparseVector{Float64,Int}} # b_idx => belief vector
+    b::Vector{SparseVector{Float64, Int}} # b_idx => belief vector
     b_children::Vector{UnitRange{Int}} # [b_idx][a_idx] => ba_idx
     Vs_upper::Vector{Float64}
     V_upper::Vector{Float64}
@@ -34,9 +34,8 @@ struct SARSOPTree
     Γ::Vector{AlphaVec{Int}}
 end
 
-
-function SARSOPTree(solver, pomdp::POMDP, b0)
-    sparse_pomdp = ModifiedSparseTabular(pomdp, b0)
+function SARSOPTree(solver, pomdp::POMDP)
+    sparse_pomdp = ModifiedSparseTabular(pomdp, solver.root_belief(pomdp))
     cache = TreeCache(sparse_pomdp)
 
     upper_policy = solve(solver.init_upper, sparse_pomdp)
@@ -44,7 +43,6 @@ function SARSOPTree(solver, pomdp::POMDP, b0)
 
     tree = SARSOPTree(
         sparse_pomdp,
-
         Vector{Float64}[],
         Vector{Int}[],
         corner_values, #upper_policy.util,
@@ -63,8 +61,8 @@ function SARSOPTree(solver, pomdp::POMDP, b0)
         Vector{Int}(),
         BitVector(),
         cache,
-        PruneData(0,0,solver.prunethresh),
-        AlphaVec{Int}[]
+        PruneData(0, 0, solver.prunethresh),
+        AlphaVec{Int}[],
     )
     return insert_root!(solver, tree, _initialize_belief(pomdp, initialstate(pomdp)))
 end
@@ -82,7 +80,7 @@ POMDPs.discount(tree::SARSOPTree) = discount(tree.pomdp)
 function _initialize_belief(pomdp::POMDP, dist::Any=initialstate(pomdp))
     ns = length(states(pomdp))
     b = zeros(ns)
-    for s in support(dist)
+    for s ∈ support(dist)
         sidx = stateindex(pomdp, s)
         b[sidx] = pdf(dist, s)
     end
@@ -93,7 +91,7 @@ function insert_root!(solver, tree::SARSOPTree, b)
     pomdp = tree.pomdp
 
     Γ_lower = solve(solver.init_lower, pomdp)
-    for (α,a) ∈ alphapairs(Γ_lower)
+    for (α, a) ∈ alphapairs(Γ_lower)
         new_val = dot(α, b)
         push!(tree.Γ, AlphaVec(α, a))
     end
@@ -118,7 +116,7 @@ function update(tree::SARSOPTree, b_idx::Int, a, o)
     ba_idx = tree.b_children[b_idx][a]
     bp_idx = tree.ba_children[ba_idx][o]
     V̲, V̄ = if tree.is_terminal[bp_idx]
-        0.,0.
+        0.0, 0.0
     else
         lower_value(tree, tree.b[bp_idx]), upper_value(tree, tree.b[bp_idx])
     end
@@ -139,7 +137,7 @@ function add_belief!(tree::SARSOPTree, b, ba_idx::Int, o)
     push!(tree.is_terminal, terminal)
 
     V̲, V̄ = if terminal
-        0., 0.
+        0.0, 0.0
     else
         lower_value(tree, b), upper_value(tree, b)
     end
@@ -175,19 +173,19 @@ function fill_populated!(tree::SARSOPTree, b_idx::Int)
     b = tree.b[b_idx]
     Qa_upper = tree.Qa_upper[b_idx]
     Qa_lower = tree.Qa_lower[b_idx]
-    for a in ACT
+    for a ∈ ACT
         ba_idx = tree.b_children[b_idx][a]
         tree.ba_pruned[ba_idx] && continue
         Rba = belief_reward(tree, b, a)
         Q̄ = Rba
         Q̲ = Rba
 
-        for o in OBS
+        for o ∈ OBS
             bp_idx, V̲, V̄ = update(tree, b_idx, a, o)
             b′ = tree.b[bp_idx]
             po = tree.poba[ba_idx][o]
-            Q̄ += γ*po*V̄
-            Q̲ += γ*po*V̲
+            Q̄ += γ * po * V̄
+            Q̲ += γ * po * V̲
         end
 
         Qa_upper[a] = Q̄
@@ -195,7 +193,7 @@ function fill_populated!(tree::SARSOPTree, b_idx::Int)
     end
 
     tree.V_lower[b_idx] = lower_value(tree, tree.b[b_idx])
-    tree.V_upper[b_idx] = maximum(tree.Qa_upper[b_idx])
+    return tree.V_upper[b_idx] = maximum(tree.Qa_upper[b_idx])
 end
 
 function fill_unpopulated!(tree::SARSOPTree, b_idx::Int)
@@ -211,15 +209,15 @@ function fill_unpopulated!(tree::SARSOPTree, b_idx::Int)
 
     Qa_upper = Vector{Float64}(undef, N_ACT)
     Qa_lower = Vector{Float64}(undef, N_ACT)
-    b_children = (n_ba+1):(n_ba+N_ACT)
+    b_children = (n_ba + 1):(n_ba + N_ACT)
 
-    for a in A
+    for a ∈ A
         ba_idx = add_action!(tree, b_idx, a)
-        ba_children = (n_b+1):(n_b+N_OBS)
+        ba_children = (n_b + 1):(n_b + N_OBS)
         tree.ba_children[ba_idx] = ba_children
 
         n_b += N_OBS
-        pred = dropzeros!(mul!(tree.cache.pred, pomdp.T[a],b))
+        pred = dropzeros!(mul!(tree.cache.pred, pomdp.T[a], b))
         poba = zeros(Float64, N_OBS)
         Rba = belief_reward(tree, b, a)
 
@@ -230,15 +228,15 @@ function fill_unpopulated!(tree::SARSOPTree, b_idx::Int)
             # belief update
             bp = corrector(pomdp, pred, a, o)
             po = sum(bp)
-            if po > 0.
+            if po > 0.0
                 bp.nzval ./= po
                 poba[o] = po
             end
 
             bp_idx, V̲, V̄ = add_belief!(tree, bp, ba_idx, o)
 
-            Q̄ += γ*po*V̄
-            Q̲ += γ*po*V̲
+            Q̄ += γ * po * V̄
+            Q̲ += γ * po * V̲
         end
         Qa_upper[a] = Q̄
         Qa_lower[a] = Q̲
@@ -247,5 +245,5 @@ function fill_unpopulated!(tree::SARSOPTree, b_idx::Int)
     tree.Qa_upper[b_idx] = Qa_upper
     tree.Qa_lower[b_idx] = Qa_lower
     tree.V_lower[b_idx] = lower_value(tree, tree.b[b_idx])
-    tree.V_upper[b_idx] = maximum(tree.Qa_upper[b_idx])
+    return tree.V_upper[b_idx] = maximum(tree.Qa_upper[b_idx])
 end
