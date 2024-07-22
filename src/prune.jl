@@ -51,10 +51,10 @@ end
 
 function intersection_distance(α1, α2, b)
     dot_sum = 0.0
-    I,B = b.nzind, b.nzval
+    I, B = b.nzind, b.nzval
     for _i ∈ eachindex(I)
         i = I[_i]
-        dot_sum += (α1[i] - α2[i])*B[_i]
+        dot_sum += (α1[i] - α2[i]) * B[_i]
     end
     s = 0.0
     for i ∈ eachindex(α1, α2)
@@ -122,26 +122,47 @@ end
 
 function prune_strictly_dominated!(tree::SARSOPTree, eps=1e-10)
     Γ = tree.Γ
-    Γ_new_idxs = Int[]
+    Γ_new_idxs = Vector{Int}(undef, length(Γ))
+    keep = trues(length(Γ))
 
+    idx_count = 0
     for (α_try_idx, α_try) in enumerate(Γ)
-        marked_for_deletion = falses(length(Γ_new_idxs))
         dominated = false
-        for (jj, α_in_idx) in enumerate(Γ_new_idxs)
+        for jj in 1:idx_count
+            α_in_idx = Γ_new_idxs[jj]
             α_in = Γ[α_in_idx]
             if strictly_dominates(α_try, α_in, eps)
-                marked_for_deletion[jj] = true
+                keep[jj] = false
             elseif strictly_dominates(α_in, α_try, eps)
                 dominated = true
                 break
             end
         end
         if !dominated
-            Γ_new_idxs = Γ_new_idxs[.!marked_for_deletion]
-            push!(Γ_new_idxs, α_try_idx)
+            new_idx_count = 0
+            for jj in 1:idx_count
+                if keep[jj]
+                    new_idx_count += 1
+                    Γ_new_idxs[new_idx_count] = Γ_new_idxs[jj]
+                end
+            end
+            new_idx_count += 1
+            Γ_new_idxs[new_idx_count] = α_try_idx
+            idx_count = new_idx_count
+            fill!(keep, true)
         end
     end
 
-    Γ_idxs_to_delete = setdiff(1:length(Γ), Γ_new_idxs)
-    deleteat!(Γ, Γ_idxs_to_delete)
+    resize!(Γ_new_idxs, idx_count)
+
+    to_delete = trues(length(Γ))
+    for idx in Γ_new_idxs
+        to_delete[idx] = false
+    end
+
+    for ii in length(Γ):-1:1
+        if to_delete[ii]
+            deleteat!(Γ, ii)
+        end
+    end
 end
