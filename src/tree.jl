@@ -428,6 +428,14 @@ function entropy(b::AbstractVector)
     return ent
 end
 
+function entropy(b::SparseVector)
+    ent = 0.0
+    for b_i in b.nzval
+        ent -= b_i * log(b_i)
+    end
+    return ent
+end
+
 function get_interval_idx(value::Float64, lower::Float64, interval::Float64, num_intervals::Int)
     if interval == 0.0
         return 1
