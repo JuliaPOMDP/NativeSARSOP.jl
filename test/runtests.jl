@@ -104,7 +104,7 @@ end
     @test abs(value(Γ1, initialstate(pomdp)) - value(Γ2, initialstate(pomdp))) < 1e-7
     
     Γ, info = solve_info(solver, pomdp)
-    @test !isempty(info.tree.bm.bin_levels[1][:bin_count])
+    @test !isempty(info.tree.bm.bin_levels[1].bin_count)
     @test length(info.tree.bm.bin_levels) == 2
 end
 
