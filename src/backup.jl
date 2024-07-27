@@ -77,7 +77,7 @@ function backup!(tree, b_idx)
         end
     end
 
-    α = AlphaVec(best_α, best_action)
+    α = AlphaVec(best_α, best_action, Set(b_idx))
     push!(Γ, α)
     tree.V_lower[b_idx] = V
 end

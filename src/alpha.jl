@@ -1,6 +1,7 @@
 struct AlphaVec{A} <: AbstractVector{Float64}
     alpha::Vector{Float64}
     action::A
+    witnesses::Set{Int}
 end
 
 @inline Base.length(v::AlphaVec) = length(v.alpha)
