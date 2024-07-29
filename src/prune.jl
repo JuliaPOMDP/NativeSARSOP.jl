@@ -48,16 +48,27 @@ function prune!(tree::SARSOPTree)
     end
 end
 
-function belief_space_domination(α1, α2, B, δ)
-    a1_dominant = true
-    a2_dominant = true
-    for b ∈ B
-        !a1_dominant && !a2_dominant && return (false, false)
-        δV = intersection_distance(α1, α2, b)
-        δV ≤ δ && (a1_dominant = false)
-        δV ≥ -δ && (a2_dominant = false)
+function recertify_witnesses!(tree, α1, α2, δ)
+
+    if α1 == α2
+        union!(α2.witnesses, α1.witnesses)
+        empty!(α1.witnesses)
+        return
     end
-    return a1_dominant, a2_dominant
+
+    for b_idx in α1.witnesses
+        if tree.b_pruned[b_idx]
+            delete!(α1.witnesses, b_idx)
+            continue
+        end
+
+        δV = intersection_distance(α2, α1, tree.b[b_idx])
+        
+        if δV > δ
+            delete!(α1.witnesses, b_idx)
+            push!(α2.witnesses, b_idx)
+        end
+    end
 end
 
 @inline function intersection_distance(α1, α2, b)
@@ -75,30 +86,18 @@ end
 
 function prune_alpha!(tree::SARSOPTree, δ)
     Γ = tree.Γ
-    B_valid = tree.b[map(!,tree.b_pruned)]
     pruned = falses(length(Γ))
 
-    # checking if α_i dominates α_j
-    for (i,α_i) ∈ enumerate(Γ)
+    for (i, α_i) ∈ enumerate(Γ)
         pruned[i] && continue
-        for (j,α_j) ∈ enumerate(Γ)
-            (j ≤ i || pruned[j]) && continue
-            a1_dominant,a2_dominant = belief_space_domination(α_i, α_j, B_valid, δ)
-            #=
-            NOTE: α1 and α2 shouldn't technically be able to mutually dominate
-            i.e. a1_dominant and a2_dominant should never both be true.
-            But this does happen when α1 == α2 because intersection_distance returns NaN.
-            Current impl prunes α2 without doing an equality check, removing
-            the duplicate α. Could do equality check to short-circuit
-            belief_space_domination which would speed things up if we have
-            a lot of duplicates, but the equality check can slow things down
-            if α's are sufficiently diverse.
-            =#
-            if a1_dominant
-                pruned[j] = true
-            elseif a2_dominant
+        for (j, α_j) ∈ enumerate(Γ)
+            (pruned[j] || j == i) && continue
+            recertify_witnesses!(tree, α_i, α_j, δ)
+            if isempty(α_i.witnesses)
                 pruned[i] = true
                 break
+            elseif isempty(α_j.witnesses)
+                pruned[j] = true
             end
         end
     end

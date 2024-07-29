@@ -76,9 +76,13 @@ function backup!(tree, b_idx)
             best_action = a
         end
     end
-
-    α = AlphaVec(best_α, best_action)
-    push!(Γ, α)
+    α_idx = findfirst(x->x == best_α, Γ)
+    if α_idx === nothing
+        α = AlphaVec(best_α, best_action, Set(b_idx))
+        push!(Γ, α)
+    else
+        union!(Γ[α_idx].witnesses, b_idx)
+    end
     tree.V_lower[b_idx] = V
 end
 

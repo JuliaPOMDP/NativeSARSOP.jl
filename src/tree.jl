@@ -95,7 +95,7 @@ function insert_root!(solver, tree::SARSOPTree, b)
     Γ_lower = solve(solver.init_lower, pomdp)
     for (α,a) ∈ alphapairs(Γ_lower)
         new_val = dot(α, b)
-        push!(tree.Γ, AlphaVec(α, a))
+        push!(tree.Γ, AlphaVec(α, a, Set(1)))
     end
     tree.prune_data.last_Γ_size = length(tree.Γ)
 
