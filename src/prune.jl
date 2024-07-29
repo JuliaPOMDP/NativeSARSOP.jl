@@ -91,7 +91,7 @@ function prune_alpha!(tree::SARSOPTree, δ)
     for (i, α_i) ∈ enumerate(Γ)
         pruned[i] && continue
         for (j, α_j) ∈ enumerate(Γ)
-            pruned[j] || j == i && continue
+            (pruned[j] || j == i) && continue
             recertify_witnesses!(tree, α_i, α_j, δ)
             if isempty(α_i.witnesses)
                 pruned[i] = true
