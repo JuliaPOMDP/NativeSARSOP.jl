@@ -18,8 +18,13 @@ function sample_points(sol::SARSOPSolver, tree::SARSOPTree, b_idx::Int, L, U, t,
     V̲, V̄ = tree.V_lower[b_idx], tree.V_upper[b_idx]
     γ = discount(tree)
 
-    V̂ = V̄ #TODO: BAD, binning method
-    if V̂ ≤ V̲ + sol.kappa*ϵ*γ^(-t) || (V̂ ≤ L && V̄ ≤ max(U, V̲ + ϵ*γ^(-t)))
+    if sol.use_binning
+        V̂ = get_bin_value(tree, b_idx)
+    else
+        V̂ = V̄
+    end
+    
+    if V̄ ≤ V̲ + sol.kappa*ϵ*γ^(-t) || (V̂ ≤ L && V̄ ≤ max(U, V̲ + ϵ*γ^(-t)))
         return
     else
         Q̲, Q̄, a′ = max_r_and_q(tree, b_idx)
